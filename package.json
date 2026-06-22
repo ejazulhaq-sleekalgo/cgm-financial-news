@@ -1,0 +1,21 @@
+{
+  "name": "cgm-financial-news",
+  "version": "1.0.0",
+  "description": "React Admin Panel for CGM Financial News",
+  "main": "build/index.js",
+  "scripts": {
+    "start": "wp-scripts start",
+    "build": "wp-scripts build"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.3.7",
+    "@ant-design/pro-components": "^2.6.43",
+    "antd": "^5.18.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "react-router-dom": "^6.23.1"
+  },
+  "devDependencies": {
+    "@wordpress/scripts": "^28.0.0"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "cgm/cgm-financial-news",
+  "description": "Automated financial news rewritten by OpenAI.",
+  "type": "wordpress-plugin",
+  "license": "GPL-2.0-or-later",
+  "minimum-stability": "stable",
+  "require": {
+    "php": ">=8.2",
+    "woocommerce/action-scheduler": "^3.7"
+  },
+  "autoload": {
+    "psr-4": {
+      "CGM\\FinancialNews\\": "includes/"
+    }
+  }
+}

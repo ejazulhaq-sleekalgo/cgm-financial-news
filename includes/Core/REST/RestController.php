@@ -246,7 +246,7 @@ class RestController extends WP_REST_Controller {
 		// Enrich each record with WP Post link if published.
 		foreach ( $items as &$item ) {
 			if ( ! empty( $item['post_id'] ) ) {
-				$item['post_edit_url'] = get_edit_post_link( $item['post_id'] );
+				$item['post_edit_url'] = admin_url( 'post.php?post=' . intval( $item['post_id'] ) . '&action=edit' );
 				$item['post_view_url'] = get_permalink( $item['post_id'] );
 			}
 		}
@@ -402,7 +402,7 @@ class RestController extends WP_REST_Controller {
 					'sentiment'  => get_post_meta( $id, '_cgm_sentiment', true ) ?: 'Neutral',
 					'relevance'  => get_post_meta( $id, '_cgm_importance', true ) ?: 0,
 					'view_url'   => get_permalink( $id ),
-					'edit_url'   => get_edit_post_link( $id ),
+					'edit_url'   => admin_url( 'post.php?post=' . $id . '&action=edit' ),
 				];
 			}
 			wp_reset_postdata();

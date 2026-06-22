@@ -145,7 +145,7 @@ class Database {
 			'public'             => true,
 			'publicly_queryable' => true,
 			'show_ui'            => true,
-			'show_in_menu'       => false, // We will show it inside our custom React Dashboard instead or standard WP menu. Let's keep it visible under a sub-page or register under our admin slug. Actually, setting to true makes it show in sidebar menu, but we can register it or hide/show as needed. Let's show it in admin so the admin can review articles.
+			'show_in_menu'       => true,
 			'query_var'          => true,
 			'rewrite'            => [ 'slug' => 'financial-news' ],
 			'capability_type'    => 'post',

@@ -220,7 +220,10 @@ class NewsProcessor {
 			}
 		}
 
-		// Step 5: Publish Article to WordPress CPT
+		// Step 5: Convert content to WordPress Block Editor format.
+		$final_content = $this->convert_to_wp_block_editor( $final_content );
+
+		// Step 6: Publish Article to WordPress CPT
 		$publishing_status = $this->settings->get_all()['publishing_status'] ?? 'publish';
 
 		$post_data = [
@@ -239,10 +242,10 @@ class NewsProcessor {
 			return false;
 		}
 
-		// 6. Associate with Ticker Custom Taxonomy.
+		// 7. Associate with Ticker Custom Taxonomy.
 		wp_set_object_terms( $post_id, $symbol, 'cgm_ticker', false );
 
-		// 7. Store meta details for rendering/auditing.
+		// 8. Store meta details for rendering/auditing.
 		update_post_meta( $post_id, '_cgm_original_id', sanitize_text_field( $item['source_id'] ) );
 		update_post_meta( $post_id, '_cgm_original_url', esc_url_raw( $item['source_url'] ) );
 		update_post_meta( $post_id, '_cgm_source_hash', sanitize_text_field( $item['content_hash'] ) );
@@ -251,7 +254,7 @@ class NewsProcessor {
 		update_post_meta( $post_id, '_cgm_original_title', sanitize_text_field( $item['source_title'] ) );
 		update_post_meta( $post_id, '_cgm_original_content', wp_kses_post( $item['source_content'] ) );
 
-		// 8. Update registry status.
+		// 9. Update registry status.
 		$this->news_repo->update_status( $registry_id, 'processed', $post_id );
 
 		$this->logger->info(
@@ -261,5 +264,205 @@ class NewsProcessor {
 		);
 
 		return true;
+	}
+
+	/**
+	 * Convert Markdown or plain HTML content to WordPress Block Editor format.
+	 * Handles: headings, paragraphs, lists, bold, italic, links, inline code, hr.
+	 *
+	 * @param string $content Raw content (Markdown or HTML)
+	 * @return string Content wrapped in WordPress block comments
+	 */
+	private function convert_to_wp_block_editor( string $content ): string {
+		$content = trim( $content );
+
+		if ( empty( $content ) ) {
+			return $content;
+		}
+
+		// Already in block editor format — return as-is.
+		if ( str_contains( $content, '<!-- wp:' ) ) {
+			return $content;
+		}
+
+		// If it contains HTML block-level tags, just wrap them in blocks.
+		if ( preg_match( '/<(p|h[1-6]|ul|ol|li|blockquote|pre|hr|table)[\s>]/i', $content ) ) {
+			return $this->wrap_html_in_blocks( $content );
+		}
+
+		// Otherwise treat as Markdown and convert.
+		return $this->markdown_to_wp_blocks( $content );
+	}
+
+	/**
+	 * Wrap raw HTML block elements in WordPress block comments.
+	 */
+	private function wrap_html_in_blocks( string $html ): string {
+		$blocks = [];
+
+		// Normalise line endings, then split on block-level tags (keep the tags).
+		$html  = preg_replace( '/\r\n?/', "\n", $html );
+		$parts = preg_split(
+			'/(<(?:p|h[1-6]|ul|ol|li|blockquote|pre|hr|table)[^>]*>)/i',
+			$html,
+			-1,
+			PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY
+		);
+
+		$buffer = '';
+		$in_tag = false;
+
+		foreach ( $parts as $part ) {
+			if ( preg_match( '/^<(p|h[1-6]|ul|ol|blockquote|pre)(\s[^>]*)?>$/i', $part, $m ) ) {
+				if ( $buffer !== '' ) {
+					$blocks[] = '<!-- wp:paragraph --><p>' . trim( $buffer ) . '</p><!-- /wp:paragraph -->';
+					$buffer   = '';
+				}
+				$blocks[] = '<!-- wp:' . strtolower( $m[1] ) . ' -->';
+				$blocks[] = $part;
+				$in_tag   = strtolower( $m[1] );
+			} elseif ( $in_tag && preg_match( '/^<\/(p|h[1-6]|ul|ol|blockquote|pre)>$/i', $part, $m ) && strtolower( $m[1] ) === $in_tag ) {
+				$blocks[] = $part;
+				$blocks[] = '<!-- /wp:' . $in_tag . ' -->';
+				$in_tag   = false;
+			} elseif ( preg_match( '/^<(hr|li)(\s[^>]*)?(\/?)>$/i', $part, $m ) ) {
+				$tag = strtolower( $m[1] );
+				if ( $tag === 'hr' ) {
+					$blocks[] = '<!-- wp:separator --><hr class="wp-block-separator" /><!-- /wp:separator -->';
+				} elseif ( $tag === 'li' ) {
+					$blocks[] = $part; // Handled inside ul/ol blocks
+				}
+			} else {
+				$buffer .= $part;
+			}
+		}
+
+		if ( $buffer !== '' ) {
+			$blocks[] = '<!-- wp:paragraph --><p>' . trim( $buffer ) . '</p><!-- /wp:paragraph -->';
+		}
+
+		return implode( "\n", $blocks );
+	}
+
+	/**
+	 * Convert Markdown text to WordPress block editor format.
+	 */
+	private function markdown_to_wp_blocks( string $md ): string {
+		$lines  = preg_split( '/\r\n|\r|\n/', $md );
+		$blocks = [];
+		$i      = 0;
+		$count  = count( $lines );
+		$buffer = ''; // For collecting paragraph text
+
+		$flush_paragraph = function () use ( &$buffer, &$blocks ) {
+			if ( $buffer !== '' ) {
+				$text     = $this->inline_markdown_to_html( trim( $buffer ) );
+				$blocks[] = '<!-- wp:paragraph --><p>' . $text . '</p><!-- /wp:paragraph -->';
+				$buffer   = '';
+			}
+		};
+
+		while ( $i < $count ) {
+			$line    = $lines[ $i ];
+			$trimmed = trim( $line );
+
+			// Empty line → paragraph boundary.
+			if ( $trimmed === '' ) {
+				$flush_paragraph();
+				$i++;
+				continue;
+			}
+
+			// Thematic break: ---, ***, ___
+			if ( preg_match( '/^(?:[-*_]\s*){3,}$/', $trimmed ) ) {
+				$flush_paragraph();
+				$blocks[] = '<!-- wp:separator --><hr class="wp-block-separator" /><!-- /wp:separator -->';
+				$i++;
+				continue;
+			}
+
+			// Heading: ## text
+			if ( preg_match( '/^(#{1,6})\s+(.+)$/', $trimmed, $m ) ) {
+				$flush_paragraph();
+				$level = strlen( $m[1] );
+				$text  = $this->inline_markdown_to_html( $m[2] );
+				$blocks[] = '<!-- wp:heading {"level":' . $level . '} --><h' . $level . '>' . $text . '</h' . $level . '><!-- /wp:heading -->';
+				$i++;
+				continue;
+			}
+
+			// Unordered list: - item or * item
+			if ( preg_match( '/^[\*\-+]\s+(.+)$/', $trimmed, $m ) ) {
+				$flush_paragraph();
+				$items = [];
+				while ( $i < $count ) {
+					$tl = trim( $lines[ $i ] );
+					if ( preg_match( '/^[\*\-+]\s+(.+)$/', $tl, $im ) ) {
+						$items[] = '<li>' . $this->inline_markdown_to_html( $im[1] ) . '</li>';
+						$i++;
+					} elseif ( $tl === '' ) {
+						$i++;
+						break;
+					} else {
+						break;
+					}
+				}
+				if ( $items ) {
+					$blocks[] = '<!-- wp:list --><ul>' . implode( '', $items ) . '</ul><!-- /wp:list -->';
+				}
+				continue;
+			}
+
+			// Ordered list: 1. item
+			if ( preg_match( '/^\d+\.\s+(.+)$/', $trimmed, $m ) ) {
+				$flush_paragraph();
+				$items = [];
+				while ( $i < $count ) {
+					$tl = trim( $lines[ $i ] );
+					if ( preg_match( '/^\d+\.\s+(.+)$/', $tl, $im ) ) {
+						$items[] = '<li>' . $this->inline_markdown_to_html( $im[1] ) . '</li>';
+						$i++;
+					} elseif ( $tl === '' ) {
+						$i++;
+						break;
+					} else {
+						break;
+					}
+				}
+				if ( $items ) {
+					$blocks[] = '<!-- wp:list {"ordered":true} --><ol>' . implode( '', $items ) . '</ol><!-- /wp:list -->';
+				}
+				continue;
+			}
+
+			// Regular paragraph line — accumulate into buffer.
+			$buffer .= ( $buffer !== '' ? ' ' : '' ) . $line;
+			$i++;
+		}
+
+		$flush_paragraph();
+
+		return implode( "\n", $blocks );
+	}
+
+	/**
+	 * Convert inline Markdown formatting to HTML.
+	 */
+	private function inline_markdown_to_html( string $text ): string {
+		// Bold: **text** or __text__
+		$text = preg_replace( '/\*\*(.+?)\*\*/', '<strong>$1</strong>', $text );
+		$text = preg_replace( '/__(.+?)__/', '<strong>$1</strong>', $text );
+
+		// Italic: *text* or _text_ (but not inside words like some_text_here)
+		$text = preg_replace( '/(?<!\w)\*(?!\s)(.+?)(?<!\s)\*(?!\w)/', '<em>$1</em>', $text );
+		$text = preg_replace( '/(?<!\w)_(?!\s)(.+?)(?<!\s)_(?!\w)/', '<em>$1</em>', $text );
+
+		// Inline code: `code`
+		$text = preg_replace( '/`(.+?)`/', '<code>$1</code>', $text );
+
+		// Links: [text](url)
+		$text = preg_replace( '/\[(.+?)\]\((.+?)\)/', '<a href="$2">$1</a>', $text );
+
+		return $text;
 	}
 }

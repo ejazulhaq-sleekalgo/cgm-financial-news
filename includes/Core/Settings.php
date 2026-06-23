@@ -175,7 +175,7 @@ CRITICAL INSTRUCTIONS:
   \"sentiment\": \"Positive\", // Positive, Negative, or Neutral
   \"summary\": \"A short 1-2 sentence executive summary.\",
   \"title\": \"A strong, professional, rewritten news headline.\",
-  \"content\": \"The full rewritten article content formatted in clean Markdown. Include paragraphs, headers, and bullet points if appropriate.\",
+  \"content\": \"The full rewritten article content in WordPress block editor HTML format. Use standard HTML tags like <p>, <h2>, <h3>, <ul>, <li>, <strong>, <em>. Do NOT use Markdown syntax. Output clean HTML only.\",
   \"extracted_facts\": [\"Fact 1\", \"Fact 2\"] // List of core financial figures or facts preserved
 }
 

@@ -182,6 +182,8 @@ class NewsProcessor {
 		}
 
 		$rewritten['model'] = $this->settings->get_openai_model();
+		$rewritten['title'] = trim( (string) ( $rewritten['title'] ?? '' ) );
+		$rewritten['content'] = $this->prepare_content_for_publishing( (string) ( $rewritten['content'] ?? '' ), (string) ( $item['source_content'] ?? '' ) );
 		$this->news_repo->save_rewrite( $registry_id, $rewritten, 'rewritten' );
 
 		if ( $this->looks_repetitive( $rewritten['content'] ?? '', $item['source_content'] ?? '' ) ) {
@@ -231,8 +233,9 @@ class NewsProcessor {
 			}
 		}
 
-		// Step 5: Convert content to WordPress Block Editor format.
-		$final_content = $this->convert_to_wp_block_editor( $final_content );
+		// Step 5: Normalize and convert content to WordPress Block Editor format.
+		// $final_content = $this->prepare_content_for_publishing( $final_content, $item['source_content'] ?? '' );
+		// $final_content = $this->convert_to_wp_block_editor( $final_content );
 
 		// Step 6: Publish Article to WordPress CPT
 		$publishing_status = $this->settings->get_all()['publishing_status'] ?? 'publish';
@@ -398,6 +401,61 @@ class NewsProcessor {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Normalize rewritten content so the saved rewrite and the published post stay consistent.
+	 * Removes empty sections and repeated paragraphs before block conversion.
+	 *
+	 * @param string $content
+	 * @param string $source_content
+	 * @return string
+	 */
+	private function prepare_content_for_publishing( string $content, string $source_content = '' ): string {
+		$content = preg_replace( '/\r\n?|\n/', "\n", trim( $content ) );
+		if ( ! is_string( $content ) ) {
+			$content = '';
+		}
+
+		if ( '' === $content ) {
+			return '';
+		}
+
+		$content = preg_replace( '/\n{3,}/', "\n\n", $content );
+		if ( ! is_string( $content ) ) {
+			$content = '';
+		}
+
+		$paragraphs = preg_split( '/\n\s*\n/', $content );
+		$unique_paragraphs = [];
+		$seen = [];
+
+		foreach ( $paragraphs as $paragraph ) {
+			$paragraph = trim( $paragraph );
+			if ( '' === $paragraph ) {
+				continue;
+			}
+
+			$clean_paragraph = trim( preg_replace( '/\s+/', ' ', strip_tags( $paragraph ) ) );
+			if ( '' === $clean_paragraph ) {
+				continue;
+			}
+
+			$key = strtolower( $clean_paragraph );
+			if ( isset( $seen[ $key ] ) ) {
+				continue;
+			}
+
+			$seen[ $key ] = true;
+			$unique_paragraphs[] = $paragraph;
+		}
+
+		$prepared = implode( "\n\n", $unique_paragraphs );
+		if ( '' === trim( $prepared ) ) {
+			return trim( $content );
+		}
+
+		return trim( $prepared );
 	}
 
 	private function markdown_to_wp_blocks( string $md ): string {

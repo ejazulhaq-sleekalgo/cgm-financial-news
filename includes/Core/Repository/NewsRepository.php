@@ -85,6 +85,53 @@ class NewsRepository {
 	}
 
 	/**
+	 * Persist rewrite data for an item.
+	 *
+	 * @param int    $id
+	 * @param array  $rewrite_data
+	 * @param string $status
+	 * @return bool
+	 */
+	public function save_rewrite( int $id, array $rewrite_data, string $status = 'rewritten' ): bool {
+		global $wpdb;
+		$table = $wpdb->prefix . 'cgm_news_registry';
+
+		$data = [
+			'rewrite_title'     => wp_kses_post( $rewrite_data['title'] ?? '' ),
+			'rewrite_content'   => wp_kses_post( $rewrite_data['content'] ?? '' ),
+			'rewrite_summary'   => wp_kses_post( $rewrite_data['summary'] ?? '' ),
+			'rewrite_sentiment' => sanitize_text_field( $rewrite_data['sentiment'] ?? '' ),
+			'rewrite_relevance' => intval( $rewrite_data['relevance'] ?? 0 ),
+			'rewrite_facts'     => wp_kses_post( wp_json_encode( $rewrite_data['extracted_facts'] ?? [] ) ),
+			'rewrite_model'     => sanitize_text_field( $rewrite_data['model'] ?? '' ),
+			'rewrite_status'    => sanitize_text_field( $status ),
+			'rewrite_error'     => sanitize_textarea_field( $rewrite_data['error'] ?? '' ),
+		];
+
+		return false !== $wpdb->update( $table, $data, [ 'id' => $id ], [ '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s' ], [ '%d' ] );
+	}
+
+	/**
+	 * Persist the final post content for an item.
+	 *
+	 * @param int    $id
+	 * @param string $post_title
+	 * @param string $post_content
+	 * @return bool
+	 */
+	public function save_published_post( int $id, string $post_title, string $post_content ): bool {
+		global $wpdb;
+		$table = $wpdb->prefix . 'cgm_news_registry';
+
+		$data = [
+			'post_title'   => wp_kses_post( $post_title ),
+			'post_content' => wp_kses_post( $post_content ),
+		];
+
+		return false !== $wpdb->update( $table, $data, [ 'id' => $id ], [ '%s', '%s' ], [ '%d' ] );
+	}
+
+	/**
 	 * Get a single registry record by ID.
 	 *
 	 * @param int $id

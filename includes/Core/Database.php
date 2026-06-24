@@ -47,6 +47,17 @@ class Database {
 			content_hash varchar(64) NOT NULL,
 			status varchar(30) NOT NULL DEFAULT 'pending',
 			post_id bigint(20) DEFAULT NULL,
+			rewrite_title text DEFAULT NULL,
+			rewrite_content longtext DEFAULT NULL,
+			rewrite_summary text DEFAULT NULL,
+			rewrite_sentiment varchar(20) DEFAULT NULL,
+			rewrite_relevance tinyint(3) DEFAULT NULL,
+			rewrite_facts longtext DEFAULT NULL,
+			rewrite_model varchar(50) DEFAULT NULL,
+			rewrite_status varchar(30) DEFAULT NULL,
+			rewrite_error text DEFAULT NULL,
+			post_title text DEFAULT NULL,
+			post_content longtext DEFAULT NULL,
 			error_message text DEFAULT NULL,
 			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			published_at datetime DEFAULT NULL,
@@ -54,7 +65,9 @@ class Database {
 			KEY ticker (ticker),
 			KEY source_id (source_id),
 			KEY source_url (source_url(191)),
-			KEY content_hash (content_hash)
+			KEY content_hash (content_hash),
+			KEY status (status),
+			KEY post_id (post_id)
 		) $charset_collate;";
 
 		dbDelta( $sql_registry );

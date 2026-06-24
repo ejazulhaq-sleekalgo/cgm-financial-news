@@ -176,7 +176,18 @@ class NewsProcessor {
 		$rewritten = $this->openai->rewrite_article( $symbol, $item['source_title'], $item['source_content'] );
 		if ( ! is_array( $rewritten ) || empty( $rewritten['title'] ) || empty( $rewritten['content'] ) ) {
 			$err_msg = 'OpenAI rewrite API returned an empty or invalid response.';
+			$this->news_repo->save_rewrite( $registry_id, [ 'error' => $err_msg, 'model' => $this->settings->get_openai_model() ], 'failed' );
 			$this->news_repo->update_status( $registry_id, 'failed', null, $err_msg );
+			return false;
+		}
+
+		$rewritten['model'] = $this->settings->get_openai_model();
+		$this->news_repo->save_rewrite( $registry_id, $rewritten, 'rewritten' );
+
+		if ( $this->looks_repetitive( $rewritten['content'] ?? '', $item['source_content'] ?? '' ) ) {
+			$err_msg = 'AI rewrite output was rejected because it contained repetitive or copied content.';
+			$this->news_repo->update_status( $registry_id, 'failed', null, $err_msg );
+			$this->logger->warning( $symbol, 'ai_rewrite_rejected', $err_msg, [ 'ai_response' => $rewritten ] );
 			return false;
 		}
 
@@ -244,6 +255,8 @@ class NewsProcessor {
 
 		// 7. Associate with Ticker Custom Taxonomy.
 		wp_set_object_terms( $post_id, $symbol, 'cgm_ticker', false );
+
+		$this->news_repo->save_published_post( $registry_id, $final_title, $final_content );
 
 		// 8. Store meta details for rendering/auditing.
 		update_post_meta( $post_id, '_cgm_original_id', sanitize_text_field( $item['source_id'] ) );
@@ -347,6 +360,46 @@ class NewsProcessor {
 	/**
 	 * Convert Markdown text to WordPress block editor format.
 	 */
+	private function looks_repetitive( string $content, string $source_content ): bool {
+		$clean_content = trim( preg_replace( '/\s+/', ' ', strip_tags( $content ) ) );
+		$clean_source  = trim( preg_replace( '/\s+/', ' ', strip_tags( $source_content ) ) );
+
+		if ( '' === $clean_content || '' === $clean_source ) {
+			return false;
+		}
+
+		$sentences = preg_split( '/(?<=[.!?])\s+/', $clean_content );
+		$seen_sentences = [];
+		foreach ( $sentences as $sentence ) {
+			$sentence = trim( $sentence );
+			if ( '' === $sentence || strlen( $sentence ) < 25 ) {
+				continue;
+			}
+
+			$normalized = strtolower( $sentence );
+			if ( isset( $seen_sentences[ $normalized ] ) ) {
+				return true;
+			}
+			$seen_sentences[ $normalized ] = true;
+		}
+
+		$paragraphs = preg_split( '/\n\s*\n/', $clean_content );
+		$seen_paragraphs = [];
+		foreach ( $paragraphs as $paragraph ) {
+			$paragraph = trim( $paragraph );
+			if ( '' === $paragraph || strlen( $paragraph ) < 40 ) {
+				continue;
+			}
+			$normalized = strtolower( $paragraph );
+			if ( isset( $seen_paragraphs[ $normalized ] ) ) {
+				return true;
+			}
+			$seen_paragraphs[ $normalized ] = true;
+		}
+
+		return false;
+	}
+
 	private function markdown_to_wp_blocks( string $md ): string {
 		$lines  = preg_split( '/\r\n|\r|\n/', $md );
 		$blocks = [];

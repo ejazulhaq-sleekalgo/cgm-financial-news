@@ -23,6 +23,20 @@ class OpenAiService {
 		$this->logger   = $logger;
 	}
 
+
+	/**
+	 * Determine the correct max token parameter key based on the model name.
+	 */
+	public function get_model_max_token_parameter_key( string $model_name ): string {
+		$model_name = strtolower( trim( $model_name ) );
+		// All GPT-5 models use max_completion_tokens.
+		if ( preg_match( '/^gpt-5(?:[.-]|$)/', $model_name ) ) {
+			return 'max_completion_tokens';
+		}
+		return 'max_tokens';
+	}
+
+
 	/**
 	 * Test the OpenAI API connection.
 	 *
@@ -46,6 +60,9 @@ class OpenAiService {
 		$this->logger->info( null, 'openai_test_conn', 'Testing OpenAI API connectivity...' );
 
 		$models_to_try = $this->get_models_to_try( $this->settings->get_openai_model() );
+
+		$max_tokens_key = $this->get_model_max_token_parameter_key( $models_to_try[0] );
+
 		foreach ( $models_to_try as $model ) {
 			$body = [
 				'model'      => $model,
@@ -55,7 +72,7 @@ class OpenAiService {
 						'content' => 'Ping',
 					],
 				],
-				'max_tokens' => 5,
+				$max_tokens_key => 5,
 			];
 
 			$api_response = $this->post_to_openai( $headers, $body, 20 );
@@ -165,23 +182,39 @@ class OpenAiService {
 	 * @return array|null Rewritten article array containing relevance, sentiment, summary, title, content, extracted_facts
 	 */
 	public function rewrite_article( string $ticker, string $source_title, string $source_content ): ?array {
-		$template = $this->settings->get_all()['prompt_template'] ?? $this->settings->get_default_prompt_template();
-
-		// Replace placeholders in prompt template.
-		$prompt = str_replace(
-			[ '{ticker}', '{source_title}', '{source_content}' ],
-			[ $ticker, $source_title, $source_content ],
-			$template
-		);
-
 		$messages = [
 			[
 				'role'    => 'user',
-				'content' => $prompt,
+				'content' => $this->build_rewrite_prompt( $ticker, $source_title, $source_content, false ),
 			],
 		];
 
-		return $this->execute_json_request( $ticker, 'ai_rewrite', $messages );
+		$rewritten = $this->execute_json_request( $ticker, 'ai_rewrite', $messages );
+		if ( ! is_array( $rewritten ) ) {
+			return null;
+		}
+
+		if ( $this->has_repetitive_content( $rewritten['content'] ?? '', $source_content ) ) {
+			$this->logger->warning( $ticker, 'ai_rewrite_repeat', 'AI rewrite output looked repetitive, retrying with stricter guardrails.' );
+			$messages = [
+				[
+					'role'    => 'user',
+					'content' => $this->build_rewrite_prompt( $ticker, $source_title, $source_content, true ),
+				],
+			];
+			$rewritten = $this->execute_json_request( $ticker, 'ai_rewrite', $messages );
+		}
+
+		if ( ! is_array( $rewritten ) || ! isset( $rewritten['content'] ) ) {
+			return null;
+		}
+
+		if ( $this->has_repetitive_content( $rewritten['content'] ?? '', $source_content ) ) {
+			$this->logger->error( $ticker, 'ai_rewrite_repeat', 'AI rewrite output was rejected because it contained repetitive or copied content.' );
+			return null;
+		}
+
+		return $rewritten;
 	}
 
 	/**
@@ -299,6 +332,77 @@ class OpenAiService {
 	}
 
 	/**
+	 * Build the rewrite prompt with quality guardrails.
+	 *
+	 * @param string $ticker
+	 * @param string $source_title
+	 * @param string $source_content
+	 * @param bool   $strict
+	 * @return string
+	 */
+	private function build_rewrite_prompt( string $ticker, string $source_title, string $source_content, bool $strict = false ): string {
+		$template = $this->settings->get_all()['prompt_template'] ?? $this->settings->get_default_prompt_template();
+		$prompt = str_replace(
+			[ '{ticker}', '{source_title}', '{source_content}' ],
+			[ $ticker, $source_title, $source_content ],
+			$template
+		);
+
+		if ( $strict ) {
+			$prompt .= "\n\nSTRICT QUALITY GUARDRAILS:\n- Write a genuinely new article that is not a close paraphrase of the source.\n- Do not reuse sentences, clauses, or phrases from the source article.\n- Do not repeat the same sentence or paragraph.\n- Keep the article concise and readable with no filler.\n";
+		}
+
+		return $prompt;
+	}
+
+	/**
+	 * Detect repetitive or copied article content.
+	 *
+	 * @param string $content
+	 * @param string $source_content
+	 * @return bool
+	 */
+	private function has_repetitive_content( string $content, string $source_content ): bool {
+		$clean_content = trim( preg_replace( '/\s+/', ' ', strip_tags( $content ) ) );
+		$clean_source  = trim( preg_replace( '/\s+/', ' ', strip_tags( $source_content ) ) );
+
+		if ( '' === $clean_content || '' === $clean_source ) {
+			return false;
+		}
+
+		$sentences = preg_split( '/(?<=[.!?])\s+/', $clean_content );
+		$seen_sentences = [];
+		foreach ( $sentences as $sentence ) {
+			$sentence = trim( $sentence );
+			if ( '' === $sentence || strlen( $sentence ) < 25 ) {
+				continue;
+			}
+
+			$normalized = strtolower( $sentence );
+			if ( isset( $seen_sentences[ $normalized ] ) ) {
+				return true;
+			}
+			$seen_sentences[ $normalized ] = true;
+		}
+
+		$paragraphs = preg_split( '/\n\s*\n/', $clean_content );
+		$seen_paragraphs = [];
+		foreach ( $paragraphs as $paragraph ) {
+			$paragraph = trim( $paragraph );
+			if ( '' === $paragraph || strlen( $paragraph ) < 40 ) {
+				continue;
+			}
+			$normalized = strtolower( $paragraph );
+			if ( isset( $seen_paragraphs[ $normalized ] ) ) {
+				return true;
+			}
+			$seen_paragraphs[ $normalized ] = true;
+		}
+
+		return false;
+	}
+
+	/**
 	 * Resolve which models to try for a request.
 	 *
 	 * @param string $configured_model
@@ -306,13 +410,23 @@ class OpenAiService {
 	 */
 	private function get_models_to_try( string $configured_model ): array {
 		$configured_model = trim( $configured_model );
-		if ( '' === $configured_model ) {
-			$configured_model = self::FALLBACK_MODEL;
+		$models = [];
+
+		if ( '' !== $configured_model ) {
+			$models[] = $configured_model;
 		}
 
-		$models = [ $configured_model ];
-		if ( self::FALLBACK_MODEL !== $configured_model ) {
-			$models[] = self::FALLBACK_MODEL;
+		$preferred_fallbacks = [
+			self::FALLBACK_MODEL,
+			'gpt-4.1',
+			'gpt-4o-mini',
+			'gpt-4o',
+		];
+
+		foreach ( $preferred_fallbacks as $candidate ) {
+			if ( '' !== $candidate && ! in_array( $candidate, $models, true ) ) {
+				$models[] = $candidate;
+			}
 		}
 
 		return array_values( array_unique( $models ) );

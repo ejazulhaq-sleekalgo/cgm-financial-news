@@ -15,3 +15,12 @@ https://eodhd.com/api/us-quote-delayed?s=AAPL.US&api_token=DEMO&fmt=json
 https://chatgpt.com/s/t_6a3b8d1ed01c8191880efd287a0871f4
 
 
+https://chatgpt.com/s/t_6a3b8f26eaf08191afca909faa954294
+
+https://chatgpt.com/s/t_6a3b8f3acab08191aa9cc0638d91e2d4
+
+
+https://developers.openai.com/api/docs/models
+
+https://developers.openai.com/api/docs/models/all
+

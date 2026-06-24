@@ -58,7 +58,7 @@ class Settings {
 		return [
 			'eodhd_api_key'       => '',
 			'openai_api_key'      => '',
-			'openai_model'        => 'gpt-4o-mini',
+			'openai_model'        => 'gpt-5.4-mini',
 			'publishing_status'   => 'publish', // 'publish' or 'draft'
 			'min_relevance'       => 5, // Scale 1-10
 			'translation_enabled' => false,
@@ -81,7 +81,7 @@ class Settings {
 
 		$sanitized['eodhd_api_key']  = sanitize_text_field( $new_settings['eodhd_api_key'] ?? '' );
 		$sanitized['openai_api_key'] = sanitize_text_field( $new_settings['openai_api_key'] ?? '' );
-		$sanitized['openai_model']   = sanitize_text_field( $new_settings['openai_model'] ?? 'gpt-4o-mini' );
+		$sanitized['openai_model']   = sanitize_text_field( $new_settings['openai_model'] ?? 'gpt-5.4-mini' );
 		$sanitized['publishing_status'] = in_array( $new_settings['publishing_status'] ?? '', [ 'publish', 'draft' ], true ) ? $new_settings['publishing_status'] : 'publish';
 		$sanitized['min_relevance']  = max( 1, min( 10, intval( $new_settings['min_relevance'] ?? 5 ) ) );
 		$sanitized['translation_enabled'] = ! empty( $new_settings['translation_enabled'] );
@@ -118,7 +118,7 @@ class Settings {
 
 	public function get_openai_model(): string {
 		$settings = $this->get_all();
-		return $settings['openai_model'] ?: 'gpt-4o-mini';
+		return $settings['openai_model'] ?: 'gpt-5.4-mini';
 	}
 
 	public function get_tickers(): array {

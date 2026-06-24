@@ -35,7 +35,7 @@ class OpenAiService {
 		];
 
 		$body = [
-			'model'       => 'gpt-4o-mini',
+			'model'       => 'gpt-5.4-mini',
 			'messages'    => [
 				[
 					'role'    => 'user',

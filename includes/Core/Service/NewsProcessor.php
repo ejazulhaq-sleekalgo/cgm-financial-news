@@ -50,15 +50,15 @@ class NewsProcessor {
 			}
 
 			$symbol = $ticker['symbol'];
-			$limit  = $ticker['limit'] ?? 3;
+			$news_limit = $ticker['news_limit'] ?? 3;
 
 			// 1. Check if today's limit is already reached.
 			$today_published = $this->news_repo->get_today_published_count( $symbol );
-			if ( $today_published >= $limit ) {
+			if ( $today_published >= $news_limit ) {
 				$this->logger->info(
 					$symbol,
 					'cron_fetch_skip',
-					sprintf( 'Skipping fetch. Daily publication limit (%d) already reached. Today: %d.', $limit, $today_published )
+					sprintf( 'Skipping fetch. Daily publication limit (%d) already reached. Today: %d.', $news_limit, $today_published )
 				);
 				continue;
 			}
@@ -69,12 +69,12 @@ class NewsProcessor {
 				continue;
 			}
 
-			$queued_count = 0;
-			$allowed_to_queue = $limit - $today_published;
+			$queued_count     = 0;
+			$allowed_to_queue = $news_limit - $today_published;
 
 			foreach ( $news_items as $item ) {
 				if ( $queued_count >= $allowed_to_queue ) {
-					break; // Don't queue more than the remaining daily limit allows
+					break; // Don't queue more than the remaining daily news limit allows
 				}
 
 				// Extract article identifier
@@ -152,18 +152,18 @@ class NewsProcessor {
 		$symbol = $item['ticker'];
 
 		// Double-check limit before running heavy AI/Translation tasks.
-		$limit = 3;
+		$news_limit = 3;
 		$tickers = $this->settings->get_tickers();
 		foreach ( $tickers as $t ) {
 			if ( strcasecmp( $t['symbol'], $symbol ) === 0 ) {
-				$limit = $t['limit'] ?? 3;
+				$news_limit = $t['news_limit'] ?? 3;
 				break;
 			}
 		}
 
 		$today_published = $this->news_repo->get_today_published_count( $symbol );
-		if ( $today_published >= $limit ) {
-			$err_msg = sprintf( 'Daily limit of %d articles reached for ticker %s. Post skipped.', $limit, $symbol );
+		if ( $today_published >= $news_limit ) {
+			$err_msg = sprintf( 'Daily limit of %d articles reached for ticker %s. Post skipped.', $news_limit, $symbol );
 			$this->news_repo->update_status( $registry_id, 'failed', null, $err_msg );
 			$this->logger->warning( $symbol, 'process_job_limit_exceeded', $err_msg );
 			return false;
@@ -227,7 +227,7 @@ class NewsProcessor {
 		$publishing_status = $this->settings->get_all()['publishing_status'] ?? 'publish';
 
 		$post_data = [
-			'post_title'   => sanitize_text_field( $final_title ),
+			'post_title'   => sanitize_text_field( html_entity_decode( $final_title, ENT_QUOTES, 'UTF-8' ) ),
 			'post_content' => wp_kses_post( $final_content ),
 			'post_status'  => $publishing_status,
 			'post_type'    => 'cgm_news',

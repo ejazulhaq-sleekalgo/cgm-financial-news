@@ -6,7 +6,6 @@ import { api } from '../utils/api';
 export default function Tickers() {
   const [loading, setLoading] = useState(true);
   const [tickers, setTickers] = useState([]);
-  const [settings, setSettings] = useState({});
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTicker, setEditingTicker] = useState(null);
   const [form] = Form.useForm();
@@ -14,11 +13,6 @@ export default function Tickers() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch settings (to save new tickers)
-      const settingsData = await api.get('/settings');
-      setSettings(settingsData);
-
-      // 2. Fetch enriched ticker statistics
       const tickersData = await api.get('/tickers');
       setTickers(tickersData);
     } catch (err) {
@@ -35,7 +29,7 @@ export default function Tickers() {
   const handleOpenAddModal = () => {
     setEditingTicker(null);
     form.resetFields();
-    form.setFieldsValue({ limit: 3, status: true });
+    form.setFieldsValue({ news_limit: 3, status: true });
     setModalOpen(true);
   };
 
@@ -45,7 +39,7 @@ export default function Tickers() {
     form.setFieldsValue({
       symbol: record.symbol,
       alias: record.alias,
-      limit: record.limit,
+      news_limit: record.news_limit,
       status: record.status === 'active'
     });
     setModalOpen(true);
@@ -53,16 +47,7 @@ export default function Tickers() {
 
   const handleDeleteTicker = async (symbolToDelete) => {
     try {
-      const updatedTickersList = settings.tickers.filter(
-        t => t.symbol.toUpperCase() !== symbolToDelete.toUpperCase()
-      );
-      
-      const newSettingsObj = {
-        ...settings,
-        tickers: updatedTickersList
-      };
-
-      await api.post('/settings', newSettingsObj);
+      await api.delete('/tickers/' + encodeURIComponent(symbolToDelete));
       message.success(`Ticker ${symbolToDelete} removed successfully.`);
       loadData();
     } catch (err) {
@@ -75,40 +60,18 @@ export default function Tickers() {
       const formattedTicker = {
         symbol: values.symbol.toUpperCase().trim(),
         alias: (values.alias || values.symbol).toUpperCase().trim(),
-        limit: parseInt(values.limit || 3, 10),
+        news_limit: parseInt(values.news_limit || 3, 10),
         status: values.status ? 'active' : 'inactive'
       };
 
-      let updatedTickersList = [];
-
       if (editingTicker) {
-        // Edit existing
-        updatedTickersList = settings.tickers.map(t => {
-          if (t.symbol.toUpperCase() === editingTicker.symbol.toUpperCase()) {
-            return formattedTicker;
-          }
-          return t;
-        });
+        await api.put('/tickers/' + encodeURIComponent(editingTicker.symbol), formattedTicker);
+        message.success('Ticker updated successfully.');
       } else {
-        // Check duplicate symbol
-        const exists = settings.tickers.some(
-          t => t.symbol.toUpperCase() === formattedTicker.symbol
-        );
-        if (exists) {
-          message.error(`Ticker symbol "${formattedTicker.symbol}" is already configured.`);
-          return;
-        }
-        // Add new
-        updatedTickersList = [...settings.tickers, formattedTicker];
+        await api.post('/tickers', formattedTicker);
+        message.success('New ticker added successfully.');
       }
 
-      const newSettingsObj = {
-        ...settings,
-        tickers: updatedTickersList
-      };
-
-      await api.post('/settings', newSettingsObj);
-      message.success(editingTicker ? 'Ticker updated successfully.' : 'New ticker added successfully.');
       setModalOpen(false);
       loadData();
     } catch (err) {
@@ -131,24 +94,24 @@ export default function Tickers() {
     },
     {
       title: 'Daily Post Limit',
-      dataIndex: 'limit',
-      key: 'limit',
+      dataIndex: 'news_limit',
+      key: 'news_limit',
       render: (val) => `${val} articles/day`
     },
     {
       title: 'Today\'s Progress',
       key: 'progress',
       render: (_, record) => {
-        const percent = Math.min(100, Math.round((record.today_published / record.limit) * 100));
+        const percent = Math.min(100, Math.round((record.today_published / record.news_limit) * 100));
         let status = 'normal';
         if (percent >= 100) status = 'success';
         return (
           <div style={{ width: '160px' }}>
-            <Progress 
-              percent={percent} 
-              size="small" 
-              status={status} 
-              format={() => `${record.today_published}/${record.limit}`} 
+            <Progress
+              percent={percent}
+              size="small"
+              status={status}
+              format={() => `${record.today_published}/${record.news_limit}`}
             />
           </div>
         );
@@ -164,9 +127,9 @@ export default function Tickers() {
       dataIndex: 'status',
       key: 'status',
       render: (status) => (
-        <Badge 
-          status={status === 'active' ? 'success' : 'error'} 
-          text={status === 'active' ? 'Active' : 'Inactive'} 
+        <Badge
+          status={status === 'active' ? 'success' : 'error'}
+          text={status === 'active' ? 'Active' : 'Inactive'}
         />
       )
     },
@@ -175,9 +138,9 @@ export default function Tickers() {
       key: 'action',
       render: (_, record) => (
         <Space size="middle">
-          <Button 
-            type="text" 
-            icon={<EditOutlined />} 
+          <Button
+            type="text"
+            icon={<EditOutlined />}
             onClick={() => handleOpenEditModal(record)}
             style={{ color: '#1890ff' }}
           >
@@ -202,13 +165,13 @@ export default function Tickers() {
 
   return (
     <div className="cgm-fade-in-el">
-      <Card 
+      <Card
         className="cgm-premium-card"
         title={<span style={{ fontSize: '18px', fontWeight: 600 }}>Stock Tickers Configuration</span>}
         extra={
-          <Button 
-            type="primary" 
-            icon={<PlusOutlined />} 
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
             onClick={handleOpenAddModal}
             style={{ borderRadius: '6px' }}
           >
@@ -216,10 +179,10 @@ export default function Tickers() {
           </Button>
         }
       >
-        <Table 
-          columns={columns} 
-          dataSource={tickers} 
-          rowKey="symbol" 
+        <Table
+          columns={columns}
+          dataSource={tickers}
+          rowKey="symbol"
           loading={loading}
           pagination={false}
         />
@@ -260,7 +223,7 @@ export default function Tickers() {
           </Form.Item>
 
           <Form.Item
-            name="limit"
+            name="news_limit"
             label="Daily Publishing Limit"
             rules={[{ required: true, message: 'Please enter daily limit.' }]}
           >

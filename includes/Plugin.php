@@ -9,6 +9,7 @@ use CGM\FinancialNews\Core\Admin\AdminController;
 use CGM\FinancialNews\Core\REST\RestController;
 use CGM\FinancialNews\Core\Repository\LogRepository;
 use CGM\FinancialNews\Core\Repository\NewsRepository;
+use CGM\FinancialNews\Core\Repository\TickerRepository;
 use CGM\FinancialNews\Core\Service\EodhdService;
 use CGM\FinancialNews\Core\Service\OpenAiService;
 use CGM\FinancialNews\Core\Service\TranslationService;
@@ -57,7 +58,8 @@ class Plugin {
 	public function init() {
 		// Initialize Core dependencies.
 		$this->services['database']     = new Database();
-		$this->services['settings']     = new Settings();
+		$this->services['ticker_repo']  = new TickerRepository();
+		$this->services['settings']     = new Settings( $this->services['ticker_repo'] );
 		$this->services['log_repo']     = new LogRepository();
 		$this->services['news_repo']    = new NewsRepository();
 
@@ -80,7 +82,7 @@ class Plugin {
 		$this->services['scheduler']    = new Scheduler( $this->services['settings'], $this->services['news_processor'], $this->services['log_repo'] );
 
 		// Initialize REST Controllers.
-		$this->services['rest']         = new RestController( $this->services['settings'], $this->services['news_processor'], $this->services['news_repo'], $this->services['log_repo'], $this->services['scheduler'] );
+		$this->services['rest']         = new RestController( $this->services['settings'], $this->services['ticker_repo'], $this->services['news_processor'], $this->services['news_repo'], $this->services['log_repo'], $this->services['scheduler'] );
 
 		// Initialize Frontend displays.
 		$this->services['frontend']     = new Frontend( $this->services['settings'] );
@@ -106,6 +108,12 @@ class Plugin {
 
 		if ( isset( $this->services['admin'] ) ) {
 			$this->services['admin']->hooks();
+		}
+
+		// Migrate legacy tickers from settings to the custom table.
+		$migrated = $this->services['ticker_repo']->migrate_from_settings();
+		if ( $migrated > 0 ) {
+			$this->services['log_repo']->info( null, 'ticker_migration', "Migrated {$migrated} ticker(s) from settings to custom table." );
 		}
 	}
 

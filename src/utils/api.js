@@ -50,5 +50,18 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data)
     });
+  },
+
+  put: (path, data = {}) => {
+    return request(path, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  delete: (path) => {
+    return request(path, {
+      method: 'DELETE'
+    });
   }
 };

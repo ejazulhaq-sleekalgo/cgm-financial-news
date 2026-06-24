@@ -20,6 +20,7 @@ class Database {
 	 * Deactivate plugin cleanup (if necessary).
 	 */
 	public static function deactivate() {
+		self::drop_tables();
 		// Flush rewrite rules on deactivation.
 		flush_rewrite_rules();
 	}
@@ -74,6 +75,37 @@ class Database {
 		) $charset_collate;";
 
 		dbDelta( $sql_logs );
+
+		// 3. Ticker Config Table (replaces serialized tickers in settings)
+		$table_tickers = $wpdb->prefix . 'cgm_tickers';
+		$sql_tickers   = "CREATE TABLE $table_tickers (
+			id bigint(20) NOT NULL AUTO_INCREMENT,
+			symbol varchar(20) NOT NULL,
+			alias varchar(20) NOT NULL,
+			news_limit tinyint(3) NOT NULL DEFAULT 3,
+			status varchar(10) NOT NULL DEFAULT 'active',
+			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+			PRIMARY KEY (id),
+			UNIQUE KEY symbol (symbol),
+			KEY status (status)
+		) $charset_collate;";
+
+		dbDelta( $sql_tickers );
+	}
+
+	/**
+	 * Drop tables.
+	 */
+	public static function drop_tables() {
+		global $wpdb;
+		$table_registry = $wpdb->prefix . 'cgm_news_registry';
+		$table_logs     = $wpdb->prefix . 'cgm_logs';
+		$table_tickers  = $wpdb->prefix . 'cgm_tickers';
+
+		$wpdb->query( "DROP TABLE IF EXISTS $table_registry" );
+		$wpdb->query( "DROP TABLE IF EXISTS $table_logs" );
+		$wpdb->query( "DROP TABLE IF EXISTS $table_tickers" );
 	}
 
 	/**

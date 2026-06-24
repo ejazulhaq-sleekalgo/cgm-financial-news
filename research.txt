@@ -1,0 +1,9 @@
+
+https://eodhd.com/financial-apis/us-stock-market-tick-data-api
+>>
+Test Drive with "DEMO" Key
+You can start with "DEMO" API key to test the data for a few tickers only: 
+AAPL.US, TSLA.US, VTI.US, AMZN.US, BTC-USD.CC and EURUSD.FOREX. 
+For these tickers, all of our types of data (APIs), including Real-Time Data, are available without limitations.
+Register for the free plan to receive your API key (limited to 20 API calls per day) with access to End-Of-Day Historical Stock Market Data API for any ticker, but within the past year only. Plus a List of tickers per Exchange is available.
+

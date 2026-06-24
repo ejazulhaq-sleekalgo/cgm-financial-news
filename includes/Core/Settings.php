@@ -1,6 +1,8 @@
 <?php
 namespace CGM\FinancialNews\Core;
 
+use CGM\FinancialNews\Core\Repository\TickerRepository;
+
 /**
  * Settings and Option Management service.
  */
@@ -8,12 +10,23 @@ class Settings {
 
 	private const OPTION_NAME = 'cgm_financial_news_settings';
 
+	private ?TickerRepository $ticker_repo = null;
+
 	/**
 	 * Cached settings array.
 	 *
 	 * @var array|null
 	 */
 	private ?array $settings = null;
+
+	/**
+	 * Constructor.
+	 *
+	 * @param TickerRepository|null $ticker_repo
+	 */
+	public function __construct( ?TickerRepository $ticker_repo = null ) {
+		$this->ticker_repo = $ticker_repo;
+	}
 
 	/**
 	 * Get all plugin settings, with defaults merged.
@@ -52,26 +65,6 @@ class Settings {
 			'translation_lang'    => 'de', // e.g. German for AW
 			'prompt_template'     => $this->get_default_prompt_template(),
 			'verify_prompt'       => $this->get_default_verification_prompt(),
-			'tickers'             => [
-				[
-					'symbol' => 'DSEAF',
-					'alias'  => 'SEAS',
-					'limit'  => 3,
-					'status' => 'active',
-				],
-				[
-					'symbol' => 'AKEMF',
-					'alias'  => 'AEMC',
-					'limit'  => 3,
-					'status' => 'active',
-				],
-				[
-					'symbol' => 'ZAC',
-					'alias'  => 'ZAC',
-					'limit'  => 3,
-					'status' => 'active',
-				],
-			],
 		];
 	}
 
@@ -106,24 +99,6 @@ class Settings {
 			$sanitized['verify_prompt'] = $defaults['verify_prompt'];
 		}
 
-		// Sanitize Tickers
-		$sanitized['tickers'] = [];
-		if ( isset( $new_settings['tickers'] ) && is_array( $new_settings['tickers'] ) ) {
-			foreach ( $new_settings['tickers'] as $ticker ) {
-				if ( empty( $ticker['symbol'] ) ) {
-					continue;
-				}
-				$sanitized['tickers'][] = [
-					'symbol' => strtoupper( sanitize_text_field( $ticker['symbol'] ) ),
-					'alias'  => strtoupper( sanitize_text_field( $ticker['alias'] ?? $ticker['symbol'] ) ),
-					'limit'  => max( 1, intval( $ticker['limit'] ?? 3 ) ),
-					'status' => in_array( $ticker['status'] ?? '', [ 'active', 'inactive' ], true ) ? $ticker['status'] : 'active',
-				];
-			}
-		} else {
-			$sanitized['tickers'] = $defaults['tickers'];
-		}
-
 		$this->settings = $sanitized;
 		return update_option( self::OPTION_NAME, $sanitized );
 	}
@@ -147,8 +122,20 @@ class Settings {
 	}
 
 	public function get_tickers(): array {
+		if ( $this->ticker_repo ) {
+			return $this->ticker_repo->get_all();
+		}
 		$settings = $this->get_all();
-		return $settings['tickers'] ?: [];
+		return $settings['tickers'] ?? [];
+	}
+
+	/**
+	 * Set the ticker repository (used after construction).
+	 *
+	 * @param TickerRepository $ticker_repo
+	 */
+	public function set_ticker_repo( TickerRepository $ticker_repo ): void {
+		$this->ticker_repo = $ticker_repo;
 	}
 
 	/**

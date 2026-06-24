@@ -7,6 +7,7 @@ use WP_REST_Request;
 use WP_REST_Response;
 use WP_Error;
 use CGM\FinancialNews\Core\Settings;
+use CGM\FinancialNews\Core\Repository\TickerRepository;
 use CGM\FinancialNews\Core\Service\NewsProcessor;
 use CGM\FinancialNews\Core\Repository\NewsRepository;
 use CGM\FinancialNews\Core\Repository\LogRepository;
@@ -19,6 +20,7 @@ use CGM\FinancialNews\Plugin;
 class RestController extends WP_REST_Controller {
 
 	private Settings $settings;
+	private TickerRepository $ticker_repo;
 	private NewsProcessor $processor;
 	private NewsRepository $news_repo;
 	private LogRepository $logger;
@@ -31,16 +33,18 @@ class RestController extends WP_REST_Controller {
 	 */
 	public function __construct(
 		Settings $settings,
+		TickerRepository $ticker_repo,
 		NewsProcessor $processor,
 		NewsRepository $news_repo,
 		LogRepository $logger,
 		Scheduler $scheduler
 	) {
-		$this->settings  = $settings;
-		$this->processor = $processor;
-		$this->news_repo = $news_repo;
-		$this->logger    = $logger;
-		$this->scheduler = $scheduler;
+		$this->settings    = $settings;
+		$this->ticker_repo = $ticker_repo;
+		$this->processor   = $processor;
+		$this->news_repo   = $news_repo;
+		$this->logger      = $logger;
+		$this->scheduler   = $scheduler;
 	}
 
 	/**
@@ -68,11 +72,36 @@ class RestController extends WP_REST_Controller {
 			],
 		] );
 
-		// Tickers Info (active list + stats)
+		// Tickers CRUD (list, create, update, delete)
 		register_rest_route( $this->namespace_str, '/tickers', [
 			[
 				'methods'             => WP_REST_Server::READABLE,
 				'callback'            => [ $this, 'get_tickers' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+			[
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => [ $this, 'create_ticker' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+				'args'                => $this->get_ticker_args(),
+			],
+		] );
+
+		register_rest_route( $this->namespace_str, '/tickers/(?P<symbol>[A-Za-z0-9.\-]+)', [
+			[
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => [ $this, 'get_single_ticker' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+			[
+				'methods'             => WP_REST_Server::EDITABLE,
+				'callback'            => [ $this, 'update_ticker' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+				'args'                => $this->get_ticker_args(),
+			],
+			[
+				'methods'             => WP_REST_Server::DELETABLE,
+				'callback'            => [ $this, 'delete_ticker' ],
 				'permission_callback' => [ $this, 'check_permission' ],
 			],
 		] );
@@ -208,26 +237,160 @@ class RestController extends WP_REST_Controller {
 	}
 
 	/**
-	 * GET /tickers
+	 * GET /tickers — list all tickers with enriched stats.
 	 */
 	public function get_tickers( WP_REST_Request $request ): WP_REST_Response {
-		$tickers = $this->settings->get_tickers();
+		$tickers  = $this->ticker_repo->get_all();
 		$enriched = [];
 
 		foreach ( $tickers as $ticker ) {
 			$symbol = $ticker['symbol'];
 			$enriched[] = [
+				'id'              => (int) $ticker['id'],
 				'symbol'          => $symbol,
 				'alias'           => $ticker['alias'] ?? $symbol,
-				'limit'           => $ticker['limit'] ?? 3,
+				'news_limit'      => (int) ( $ticker['news_limit'] ?? 3 ),
 				'status'          => $ticker['status'] ?? 'active',
 				'today_published' => $this->news_repo->get_today_published_count( $symbol ),
 				'total_published' => $this->news_repo->get_queue_count( 'processed', $symbol ),
 				'pending_count'   => $this->news_repo->get_queue_count( 'pending', $symbol ),
+				'created_at'      => $ticker['created_at'] ?? '',
+				'updated_at'      => $ticker['updated_at'] ?? '',
 			];
 		}
 
 		return new WP_REST_Response( $enriched, 200 );
+	}
+
+	/**
+	 * GET /tickers/{symbol} — single ticker.
+	 */
+	public function get_single_ticker( WP_REST_Request $request ): WP_REST_Response {
+		$symbol = strtoupper( $request->get_param( 'symbol' ) );
+		$ticker = $this->ticker_repo->get_by_symbol( $symbol );
+
+		if ( ! $ticker ) {
+			return new WP_REST_Response( [ 'message' => 'Ticker not found.' ], 404 );
+		}
+
+		$ticker['today_published'] = $this->news_repo->get_today_published_count( $symbol );
+		$ticker['total_published'] = $this->news_repo->get_queue_count( 'processed', $symbol );
+		$ticker['pending_count']   = $this->news_repo->get_queue_count( 'pending', $symbol );
+
+		return new WP_REST_Response( $ticker, 200 );
+	}
+
+	/**
+	 * POST /tickers — create a new ticker.
+	 */
+	public function create_ticker( WP_REST_Request $request ): WP_REST_Response {
+		$params = $request->get_json_params();
+
+		$symbol = strtoupper( sanitize_text_field( $params['symbol'] ?? '' ) );
+		if ( empty( $symbol ) ) {
+			return new WP_REST_Response( [ 'message' => 'Ticker symbol is required.' ], 400 );
+		}
+
+		if ( $this->ticker_repo->exists( $symbol ) ) {
+			return new WP_REST_Response( [ 'message' => "Ticker \"{$symbol}\" already exists." ], 409 );
+		}
+
+		$id = $this->ticker_repo->create( [
+			'symbol'     => $symbol,
+			'alias'      => $params['alias'] ?? '',
+			'news_limit' => intval( $params['news_limit'] ?? 3 ),
+			'status'     => $params['status'] ?? 'active',
+		] );
+
+		if ( ! $id ) {
+			return new WP_REST_Response( [ 'message' => 'Failed to create ticker.' ], 500 );
+		}
+
+		$ticker = $this->ticker_repo->get_by_symbol( $symbol );
+		return new WP_REST_Response( $ticker, 201 );
+	}
+
+	/**
+	 * PUT /tickers/{symbol} — update an existing ticker.
+	 */
+	public function update_ticker( WP_REST_Request $request ): WP_REST_Response {
+		$symbol = strtoupper( $request->get_param( 'symbol' ) );
+
+		if ( ! $this->ticker_repo->exists( $symbol ) ) {
+			return new WP_REST_Response( [ 'message' => "Ticker \"{$symbol}\" not found." ], 404 );
+		}
+
+		$params = $request->get_json_params();
+
+		$updated = $this->ticker_repo->update( $symbol, [
+			'alias'      => $params['alias'] ?? null,
+			'news_limit' => isset( $params['news_limit'] ) ? intval( $params['news_limit'] ) : null,
+			'status'     => $params['status'] ?? null,
+		] );
+
+		if ( ! $updated ) {
+			return new WP_REST_Response( [ 'message' => 'No changes made or update failed.' ], 400 );
+		}
+
+		$ticker = $this->ticker_repo->get_by_symbol( $symbol );
+		return new WP_REST_Response( $ticker, 200 );
+	}
+
+	/**
+	 * DELETE /tickers/{symbol} — delete a ticker.
+	 */
+	public function delete_ticker( WP_REST_Request $request ): WP_REST_Response {
+		$symbol = strtoupper( $request->get_param( 'symbol' ) );
+
+		if ( ! $this->ticker_repo->exists( $symbol ) ) {
+			return new WP_REST_Response( [ 'message' => "Ticker \"{$symbol}\" not found." ], 404 );
+		}
+
+		$deleted = $this->ticker_repo->delete( $symbol );
+
+		if ( ! $deleted ) {
+			return new WP_REST_Response( [ 'message' => 'Failed to delete ticker.' ], 500 );
+		}
+
+		return new WP_REST_Response( [ 'success' => true, 'message' => "Ticker \"{$symbol}\" deleted." ], 200 );
+	}
+
+	/**
+	 * Argument schema for ticker create/update endpoints.
+	 *
+	 * @return array
+	 */
+	public function get_ticker_args(): array {
+		return [
+			'symbol' => [
+				'required'          => false,
+				'type'              => 'string',
+				'sanitize_callback' => function( $value ) {
+					return strtoupper( sanitize_text_field( $value ) );
+				},
+				'validate_callback' => function( $value ) {
+					return (bool) preg_match( '/^[A-Za-z0-9.\-]+$/', $value );
+				},
+			],
+			'alias'  => [
+				'type'              => 'string',
+				'sanitize_callback' => function( $value ) {
+					return strtoupper( sanitize_text_field( $value ) );
+				},
+			],
+			'news_limit'  => [
+				'type'              => 'integer',
+				'default'           => 3,
+				'validate_callback' => function( $value ) {
+					return is_numeric( $value ) && intval( $value ) >= 1 && intval( $value ) <= 50;
+				},
+			],
+			'status' => [
+				'type'              => 'string',
+				'default'           => 'active',
+				'enum'              => [ 'active', 'inactive' ],
+			],
+		];
 	}
 
 	/**
@@ -354,7 +517,7 @@ class RestController extends WP_REST_Controller {
 	 * GET /stats
 	 */
 	public function get_stats( WP_REST_Request $request ): WP_REST_Response {
-		$tickers = $this->settings->get_tickers();
+		$tickers = $this->ticker_repo->get_active();
 
 		$total_published = $this->news_repo->get_queue_count( 'processed' );
 		$total_failed    = $this->news_repo->get_queue_count( 'failed' );

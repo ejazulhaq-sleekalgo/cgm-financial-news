@@ -29,6 +29,13 @@ class Settings {
 	}
 
 	/**
+	 * Get Options name for settings storage.
+	 */
+	public static function get_option_name(): string {
+		return self::OPTION_NAME;
+	}
+
+	/**
 	 * Get all plugin settings, with defaults merged.
 	 *
 	 * @return array
@@ -58,7 +65,7 @@ class Settings {
 		return [
 			'eodhd_api_key'       => '',
 			'openai_api_key'      => '',
-			'openai_model'        => 'gpt-5.4-mini',
+			'openai_model'        => 'gpt-5.4-mini', // Default model for rewriting
 			'publishing_status'   => 'publish', // 'publish' or 'draft'
 			'min_relevance'       => 5, // Scale 1-10
 			'translation_enabled' => false,

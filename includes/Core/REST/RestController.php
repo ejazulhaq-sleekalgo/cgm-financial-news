@@ -496,6 +496,7 @@ class RestController extends WP_REST_Controller {
 	public function test_connection( WP_REST_Request $request ): WP_REST_Response {
 		$service = $request->get_param( 'service' );
 		$key     = $request->get_param( 'key' );
+		$key     = $this->resolve_test_key( $service, $key );
 
 		$success = false;
 
@@ -511,6 +512,28 @@ class RestController extends WP_REST_Controller {
 			return new WP_REST_Response( [ 'success' => true, 'message' => 'Connection test passed successfully.' ], 200 );
 		}
 		return new WP_REST_Response( [ 'success' => false, 'message' => 'Connection test failed. Please verify API key.' ], 400 );
+	}
+
+	/**
+	 * Resolve the API key used for testing.
+	 *
+	 * If the UI sends a masked placeholder or no key, use the saved value from settings.
+	 *
+	 * @param string      $service
+	 * @param string|null $provided_key
+	 * @return string
+	 */
+	private function resolve_test_key( string $service, ?string $provided_key ): string {
+		$provided_key = trim( (string) $provided_key );
+		if ( '' !== $provided_key && '...' !== $provided_key && false === strpos( $provided_key, '...' ) ) {
+			return $provided_key;
+		}
+
+		if ( 'eodhd' === $service ) {
+			return $this->settings->get_eodhd_key();
+		}
+
+		return $this->settings->get_openai_key();
 	}
 
 	/**

@@ -1,6 +1,8 @@
 <?php
 namespace CGM\FinancialNews\Core;
 
+use CGM\FinancialNews\Core\Settings;
+
 /**
  * Handles database table installation, CPT, and Taxonomy registrations.
  */
@@ -19,6 +21,7 @@ class Database {
 	 */
 	public static function deactivate() {
 		self::drop_tables();
+		delete_option( Settings::get_option_name() );
 		// Flush rewrite rules on deactivation.
 		flush_rewrite_rules();
 	}

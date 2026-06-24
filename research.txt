@@ -7,3 +7,11 @@ AAPL.US, TSLA.US, VTI.US, AMZN.US, BTC-USD.CC and EURUSD.FOREX.
 For these tickers, all of our types of data (APIs), including Real-Time Data, are available without limitations.
 Register for the free plan to receive your API key (limited to 20 API calls per day) with access to End-Of-Day Historical Stock Market Data API for any ticker, but within the past year only. Plus a List of tickers per Exchange is available.
 
+https://eodhd.com/api/us-quote-delayed?s=AAPL.US&api_token=DEMO&fmt=json
+
+
+==== AI Models =====
+
+https://chatgpt.com/s/t_6a3b8d1ed01c8191880efd287a0871f4
+
+

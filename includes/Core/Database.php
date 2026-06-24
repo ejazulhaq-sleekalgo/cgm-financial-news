@@ -11,8 +11,6 @@ class Database {
 	 */
 	public static function activate() {
 		self::create_tables();
-		// Flush rewrite rules on activation to ensure CPT URLs work immediately.
-		self::register_post_types_static();
 		flush_rewrite_rules();
 	}
 
@@ -109,25 +107,16 @@ class Database {
 	}
 
 	/**
-	 * Register Custom Post Types and Custom Taxonomies.
+	 * Register custom taxonomy associated with WordPress default 'post' type.
 	 */
 	public function register_post_types() {
-		add_action( 'init', [ $this, 'register_cgm_cpt' ] );
+		add_action( 'init', [ $this, 'register_cgm_taxonomy' ] );
 	}
 
 	/**
-	 * Static wrapper for activation helper.
+	 * Registers cgm_ticker custom taxonomy associated with the default 'post' type.
 	 */
-	public static function register_post_types_static() {
-		$db = new self();
-		$db->register_cgm_cpt();
-	}
-
-	/**
-	 * Registers cgm_news custom post type and cgm_ticker custom taxonomy.
-	 */
-	public function register_cgm_cpt() {
-		// Register Custom Taxonomy: Ticker Symbol
+	public function register_cgm_taxonomy() {
 		$taxonomy_labels = [
 			'name'              => _x( 'Ticker Symbols', 'taxonomy general name', 'cgm-financial-news' ),
 			'singular_name'     => _x( 'Ticker Symbol', 'taxonomy singular name', 'cgm-financial-news' ),
@@ -152,43 +141,6 @@ class Database {
 			'show_in_rest'      => true, // Enable Gutenberg and WP REST API support.
 		];
 
-		register_taxonomy( 'cgm_ticker', [ 'cgm_news' ], $taxonomy_args );
-
-		// Register Custom Post Type: Financial News
-		$cpt_labels = [
-			'name'               => _x( 'Financial News', 'post type general name', 'cgm-financial-news' ),
-			'singular_name'      => _x( 'News Article', 'post type singular name', 'cgm-financial-news' ),
-			'menu_name'          => _x( 'Financial News', 'admin menu', 'cgm-financial-news' ),
-			'name_admin_bar'     => _x( 'Financial News', 'add new on admin bar', 'cgm-financial-news' ),
-			'add_new'            => _x( 'Add New', 'news article', 'cgm-financial-news' ),
-			'add_new_item'       => __( 'Add New News Article', 'cgm-financial-news' ),
-			'new_item'           => __( 'New News Article', 'cgm-financial-news' ),
-			'edit_item'          => __( 'Edit News Article', 'cgm-financial-news' ),
-			'view_item'          => __( 'View News Article', 'cgm-financial-news' ),
-			'all_items'          => __( 'All Articles', 'cgm-financial-news' ),
-			'search_items'       => __( 'Search Financial News', 'cgm-financial-news' ),
-			'parent_item_colon'  => __( 'Parent Articles:', 'cgm-financial-news' ),
-			'not_found'          => __( 'No articles found.', 'cgm-financial-news' ),
-			'not_found_in_trash' => __( 'No articles found in Trash.', 'cgm-financial-news' ),
-		];
-
-		$cpt_args = [
-			'labels'             => $cpt_labels,
-			'public'             => true,
-			'publicly_queryable' => true,
-			'show_ui'            => true,
-			'show_in_menu'       => true,
-			'query_var'          => true,
-			'rewrite'            => [ 'slug' => 'financial-news' ],
-			'capability_type'    => 'post',
-			'has_archive'        => true,
-			'hierarchical'       => false,
-			'menu_position'      => null,
-			'supports'           => [ 'title', 'editor', 'excerpt', 'thumbnail', 'custom-fields' ],
-			'taxonomies'         => [ 'cgm_ticker' ],
-			'show_in_rest'       => true,
-		];
-
-		register_post_type( 'cgm_news', $cpt_args );
+		register_taxonomy( 'cgm_ticker', [ 'post' ], $taxonomy_args );
 	}
 }

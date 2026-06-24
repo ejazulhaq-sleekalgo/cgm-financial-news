@@ -100,8 +100,8 @@ class AdminController {
 				'namespace' => 'cgm-financial-news/v1',
 				'nonce'     => wp_create_nonce( 'wp_rest' ),
 				'siteUrl'   => esc_url( site_url() ),
-				'postType'  => 'cgm_news',
-				'cptListUrl' => esc_url( admin_url( 'edit.php?post_type=cgm_news' ) ),
+				'postType'  => 'post',
+				'cptListUrl' => esc_url( admin_url( 'edit.php' ) ),
 			]
 		);
 	}

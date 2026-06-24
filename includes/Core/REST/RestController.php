@@ -539,11 +539,18 @@ class RestController extends WP_REST_Controller {
 
 		// Fetch last 5 published articles.
 		$query = new \WP_Query([
-			'post_type'      => 'cgm_news',
+			'post_type'      => 'post',
 			'post_status'    => [ 'publish', 'draft' ],
 			'posts_per_page' => 5,
 			'orderby'        => 'date',
 			'order'          => 'DESC',
+			'tax_query'      => [
+				[
+					'taxonomy' => 'cgm_ticker',
+					'field'    => 'term_id',
+					'terms'    => $this->ticker_repo->get_active_tickers_term_ids(),
+				]
+			]
 		]);
 
 		$recent_articles = [];

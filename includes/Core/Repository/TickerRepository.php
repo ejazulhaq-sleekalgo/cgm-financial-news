@@ -48,6 +48,35 @@ class TickerRepository {
 	}
 
 	/**
+	 * Get active tickers' symbols.
+	 *
+	 * @return array
+	 */
+	public function get_active_symbols(): array {
+		$active = $this->get_active();
+		return wp_list_pluck( $active, 'symbol' );
+	}
+
+	/**
+	 * Get active tickers term ids
+	 *
+	 * @return array
+	 */
+	public function get_active_tickers_term_ids(): array {
+		$active_symbols = $this->get_active_symbols();
+		$term_ids       = [];
+
+		foreach ( $active_symbols as $symbol ) {
+			$term = term_exists( $symbol, 'cgm_ticker' );
+			if ( $term && is_array( $term ) ) {
+				$term_ids[] = $term['term_id'];
+			}
+		}
+
+		return $term_ids;
+	}
+
+	/**
 	 * Get a single ticker by symbol.
 	 *
 	 * @param string $symbol

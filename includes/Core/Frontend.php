@@ -156,7 +156,7 @@ class Frontend {
 
 		// Query CPT matching the ticker taxonomy
 		$query_args = [
-			'post_type'      => 'post',
+			'post_type'      => 'cgm_news',
 			'post_status'    => 'publish',
 			'posts_per_page' => $limit,
 			'tax_query'      => [

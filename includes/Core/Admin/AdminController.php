@@ -21,15 +21,24 @@ class AdminController {
 	 */
 	public function register_admin_pages() {
 		// Register Parent Menu
-		add_menu_page(
-			__( 'Financial News', 'cgm-financial-news' ),
-			__( 'Financial News', 'cgm-financial-news' ),
-			'manage_options',
-			self::MENU_SLUG,
-			[ $this, 'render_admin_page' ],
-			'dashicons-chart-line',
-			30
-		);
+		// add_menu_page(
+		// 	__( 'Financial News', 'cgm-financial-news' ),
+		// 	__( 'Financial News', 'cgm-financial-news' ),
+		// 	'manage_options',
+		// 	self::MENU_SLUG,
+		// 	[ $this, 'render_admin_page' ],
+		// 	'dashicons-chart-line',
+		// 	30
+		// );
+
+		add_submenu_page(
+    	    'edit.php?post_type=cgm_news',     // Parent menu (CPT)
+    	    'Settings',                    // Page title
+    	    'Settings',                    // Menu title
+    	    'manage_options',              // Capability
+    	    self::MENU_SLUG,               // Menu slug
+    	    [ $this, 'render_admin_page' ]        // Callback
+    	);
 	}
 
 	/**
@@ -54,8 +63,14 @@ class AdminController {
 	 * @param string $hook_suffix
 	 */
 	public function enqueue_admin_assets( $hook_suffix ) {
+		error_log( "AdminController::enqueue_admin_assets called with hook_suffix: $hook_suffix" );
+
 		// Only enqueue on our specific plugin admin menu page.
-		if ( 'toplevel_page_' . self::MENU_SLUG !== $hook_suffix ) {
+		// if ( 'toplevel_page_' . self::MENU_SLUG !== $hook_suffix ) {
+		// 	return;
+		// }
+
+		if ( 'cgm_news_page_' . self::MENU_SLUG !== $hook_suffix ) {
 			return;
 		}
 
@@ -100,8 +115,8 @@ class AdminController {
 				'namespace' => 'cgm-financial-news/v1',
 				'nonce'     => wp_create_nonce( 'wp_rest' ),
 				'siteUrl'   => esc_url( site_url() ),
-				'postType'  => 'post',
-				'cptListUrl' => esc_url( admin_url( 'edit.php' ) ),
+				'postType'  => 'cgm_news',
+				'cptListUrl' => esc_url( admin_url( 'edit.php?post_type=cgm_news' ) ),
 			]
 		);
 	}

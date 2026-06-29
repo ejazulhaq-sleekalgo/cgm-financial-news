@@ -562,7 +562,7 @@ class RestController extends WP_REST_Controller {
 
 		// Fetch last 5 published articles.
 		$query = new \WP_Query([
-			'post_type'      => 'post',
+			'post_type'      => 'cgm_news',
 			'post_status'    => [ 'publish', 'draft' ],
 			'posts_per_page' => 5,
 			'orderby'        => 'date',

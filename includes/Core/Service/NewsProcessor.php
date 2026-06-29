@@ -244,7 +244,7 @@ class NewsProcessor {
 			'post_title'   => sanitize_text_field( html_entity_decode( $final_title, ENT_QUOTES, 'UTF-8' ) ),
 			'post_content' => wp_kses_post( $final_content ),
 			'post_status'  => $publishing_status,
-			'post_type'    => 'post',
+			'post_type'    => 'cgm_news', // Using custom post type for news articles
 			'post_author'  => 1, // Default to admin user
 		];
 

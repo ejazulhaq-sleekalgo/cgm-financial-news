@@ -97,7 +97,7 @@ class Database {
 		$sql_tickers   = "CREATE TABLE $table_tickers (
 			id bigint(20) NOT NULL AUTO_INCREMENT,
 			symbol varchar(20) NOT NULL,
-			alias varchar(20) NOT NULL,
+			alias varchar(255) NOT NULL,
 			news_limit tinyint(3) NOT NULL DEFAULT 3,
 			status varchar(10) NOT NULL DEFAULT 'active',
 			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,

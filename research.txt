@@ -24,3 +24,191 @@ https://developers.openai.com/api/docs/models
 
 https://developers.openai.com/api/docs/models/all
 
+
+
+================================================================================================
+
+
+The plugin is ready for clinet "working demo" and now we have configured it on the TWSR site live domain.
+
+Demo Steps:
+- The plugin core functionality is working in teh same way as demostrated in previously shared demo video.
+- The plugin have registered an CPT 'Financial News'
+- The plugin will allow admin to set the EODHD Tickers
+- The plugin fetch teh news from EODHD APIs and rewrite by OpenAI APIs and store into the above CPT and group by 'EODHD Ticker' as taxonomy.
+- The 'CGM - Custom Blocks' will now provide a new block '' taht will render the 'EODHD Ticker' grouped rewriten 'financial news' on the lending 
+or blog posts.
+ 
+
+
+Important Details:
+
+The clinet provided EODHD account has 'Free Plan' and free plan have limitations and mayeb due to these limtations some time API fetch will not 
+work if limits are exced.
+
+Free Plan Limitations:
+The Free Plan restricts our usage volume:
+API Call Limits: 
+We are limited to 20 total API calls per day.
+Weighted Requests: 
+News API calls "cost" 5 API calls each. This means we can only make exactly 4 News API requests per day on the Free tier.
+
+
+Refrences:
+https://eodhd.com/pricing
+https://eodhd.com/lp/calendar-and-news-api (check first question answer of FAQs)
+
+
+Important Note:
+
+I have fond that the Tickers are different on the EODHD platform from thos which we have provided yet now and which have used for scrapping etc. 
+so ihave provided detaild list of the Tickers differences with proof so it is necessary to use the proper EODHD Ticker for EODHD APIs request in 
+the new "financial news" plugin the wrong Ticker will consume the API request with result. 
+
+Tickers Details:
+
+Title: Alaska Energy Metals Corporation
+Our Ticker: AKEMF
+Eodhd Ticker: AEMC.V 
+Eodhd URL: https://eodhd.com/financial-summary/AEMC.V
+
+Title: Zacatecas Silver Corp
+Our Ticker: ZCTSF 
+Eodhd Ticker: ZCTSF.US 
+Eodhd URL: https://eodhd.com/financial-summary/ZCTSF.US
+
+Title: Deep Sea Minerals Corp
+Our Ticker: DSEAF 
+Eodhd Ticker: DSEAF.US 
+Eodhd URL: https://eodhd.com/financial-summary/DSEAF.US
+
+Title: Alaska Energy Metals Corporation (AKEMF OTCQB)
+Our Ticker: AKEMF 
+Eodhd Ticker: AKEMF.US 
+URL: https://eodhd.com/financial-summary/AKEMF.US
+
+Title: North American Niobium & Critical Minerals Corp
+Our Ticker: NIOMF 
+Eodhd Ticker: NIOMF.US 
+URL: https://eodhd.com/financial-summary/NIOMF.US
+
+Title: Rua Gold Inc
+Our Ticker: NZAUF 
+Eodhd Ticker: NZAUF.US 
+URL: https://eodhd.com/financial-summary/NZAUF.US
+
+Title: Zeus North America Mining Corp. (ZUUZF)
+Our Ticker: ZUUZF 
+Eodhd Ticker: ZUUZF.US
+URL: https://eodhd.com/financial-summary/ZUUZF.US
+
+
+
+
+
+https://www.google.com/search?q=eodhd+free+plan+supported+symbols+list+of+financial+news+api&sca_esv=a8f6e40c8ca96117&rlz=1C1YTUH_enPK1084PK1084&ei=Q35CatetFeSlkdUPyqKrmQE&biw=1920&bih=1065&uact=5&sclient=gws-wiz-serp&udm=50&fbs=ABfTbFVyMZGZf1hfvX9uKjN_-G8cY2oODYyTyZk24Xz37_7FQ33TJTgGUSXMPMOdfjOY7e1lTDRQr69t4bH75YvsDc53PHqirsijEhBEMqBMgcmnG17gkfwbyf0XnHXZN8t7jOzf6lh-1XvDUwQ_ZMBAvx-MIO6ezRWTvxxFva99M_A7-eGscNcxdE9yc2Q1JHv1tuXv1TSQ&aep=10&ntc=1&mstk=AUtExfCULdkICOyOtPHvBQR-VutuESh3zMdk9HAuRTi1fK2n0A7bxYqYPsLHhV8h9OMoKonSK5Gs1YW8-avppgl05Bj8-7y-IzUwPrB1vJUlZG_AmRI0qgSN2LV3hhiPDyIjdTpwy8UoGUzc5UdgRmASoQoat-G-2RjL2w4&aioh=3&csuir=1&cs=0&mtid=joBCaselPMqjkdUPubq0gAU
+
+
+
+https://share.google/aimode/lIPW0ukLW0jCduS0H
+
+https://share.google/aimode/qLwMmKEGDHknv3pZT
+
+https://share.google/aimode/CoBCqa3HcD0fMWsbA
+
+
+##################
+
+To fetch financial news for this complete list of tickers in [WordPress](https://wordpress.org/), you must use their .US exchange suffix because all six trade on the [US OTC Market](https://www.otcmarkets.com/stock/AKEMF/overview). [1] 
+## The Exact EODHD Symbols
+
+* AKEMF.US (Alaska Energy Metals Corp)
+* NIOMF.US (North American Niobium & Critical Minerals Corp)
+* ZCTSF.US (Zacatecas Silver Corp)
+* NZAUF.US (Rua Gold Inc)
+* DSEAF.US (Deep Sea Minerals Corp)
+* ZUUZF.US (Zeus North America Mining Corp) [2, 3, 4, 5] 
+
+------------------------------
+## Implementation Code for WordPress
+When writing PHP inside WordPress, never use curl or file_get_contents directly. WordPress provides a built-in wrapper framework called wp_remote_get(). It natively handles timeouts, errors, and securely caches results using the [WordPress Transients API](https://developer.wordpress.org/apis/transients/) so you don't burn through your 4 daily free news API requests on every page refresh. [6, 7, 8, 9, 10] 
+You can paste this custom function into your theme's functions.php file or use a code snippets plugin: [11, 12] 
+
+function get_eodhd_custom_news() {
+    // 1. Use WordPress Transients to cache data for 12 hours (43200 seconds)
+    // This protects your Free Plan daily API limit from being exhausted instantly
+    $cached_news = get_transient('eodhd_ticker_news');
+    if ( $cached_news !== false ) {
+        return $cached_news;
+    }
+
+    // 2. Define API Parameters
+    $api_token = 'YOUR_FREE_API_TOKEN'; // Replace with your real token
+    $symbols   = 'AKEMF.US,NIOMF.US,ZCTSF.US,NZAUF.US,DSEAF.US,ZUUZF.US';
+    
+    // 3. Construct URL
+    $url = add_query_arg( array(
+        's'         => $symbols,
+        'limit'     => 10,
+        'api_token' => $api_token,
+    ), 'https://eodhd.com' );
+
+    // 4. Execute safe WordPress remote request
+    $response = wp_remote_get( $url, array( 'timeout' => 15 ) );
+
+    // Return empty array if request fails
+    if ( is_wp_error( $response ) ) {
+        return array();
+    }
+
+    // 5. Decode Response
+    $body = wp_remote_retrieve_body( $response );
+    $data = json_decode( $body, true );
+
+    // 6. Cache the successful result before returning
+    if ( is_array( $data ) ) {
+        set_transient( 'eodhd_ticker_news', $data, 43200 ); 
+        return $data;
+    }
+
+    return array();
+}
+
+## Displaying the News in Your Theme Template
+To render the pulled articles cleanly on your website frontend, loop over the array payload like this:
+
+$articles = get_eodhd_custom_news();
+
+if ( ! empty( $articles ) ) {
+    echo '<ul class="eodhd-news-list">';
+    foreach ( $articles as $article ) {
+        $title = esc_html( $article['title'] );
+        $link  = esc_url( $article['link'] );
+        $date  = esc_html( date( 'M j, Y', strtotime( $article['date'] ) ) );
+        $stock = esc_html( implode( ', ', $article['symbols'] ) );
+
+        echo "<li>";
+        echo "<a href='{$link}' target='_blank'><strong>{$title}</strong></a><br>";
+        echo "<small>Published: {$date} | Tickers: {$stock}</small>";
+        echo "</li>";
+    }
+    echo '</ul>';
+} else {
+    echo '<p>No recent news found for these assets.</p>';
+}
+
+Would you like me to convert this code into a WordPress Shortcode so you can easily drop it inside Elementor, Gutenberg, or any page layout?
+
+[1] [https://www.otcmarkets.com](https://www.otcmarkets.com/stock/AKEMF/overview)
+[2] [https://www.otcmarkets.com](https://www.otcmarkets.com/stock/NZAUF/overview)
+[3] [https://www.marketwatch.com](https://www.marketwatch.com/investing/stock/akemf)
+[4] [https://www.otcmarkets.com](https://www.otcmarkets.com/stock/NIOMF/quote)
+[5] [https://www.otcmarkets.com](https://www.otcmarkets.com/stock/ZUUZF/overview)
+[6] [https://stackoverflow.com](https://stackoverflow.com/questions/17820257/how-to-display-remote-xml-file-with-wordpress-in-frontend-using-php)
+[7] [https://my.ultrawebhosting.com](https://my.ultrawebhosting.com/knowledgebase/235/PHP-system-exec-Functions-Disabled-on-Shared-Hosting.html)
+[8] [https://patchstack.com](https://patchstack.com/articles/exploring-the-unpatched-wordpress-ssrf/)
+[9] [https://deliciousbrains.com](https://deliciousbrains.com/api-bottlenecks-in-wordpress/)
+[10] [https://code.tutsplus.com](https://code.tutsplus.com/building-a-welcome-page-for-your-wordpress-product-wp-transients-api--cms-26017a)
+[11] [https://codex.wordpress.org](https://codex.wordpress.org/Using_Custom_Fields_to_attach_images,_links_or_files_to_a_post_easily)
+[12] [https://wpsimplehacks.com](https://wpsimplehacks.com/display-woocommerce-payment-methods-conditionally/)
+
